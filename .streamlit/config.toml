@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#ff5722" # Coral/Orange accent
+backgroundColor = "#f4f4f9" # Light gray/blue tint background
+secondaryBackgroundColor = "#ffffff" # White cards/sidebar
+textColor = "#2d3748" # Deep slate/dark gray text
+font = "sans serif"
