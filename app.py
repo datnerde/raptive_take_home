@@ -25,16 +25,147 @@ Explore the tabs below to understand how different statistical properties impact
 
 # Create tabs for the four sections
 tab1, tab2, tab3, tab4 = st.tabs([
+    "🧮 A/B Testing Equivalence (t² vs F vs χ²)",
     "🎯 CTR & The Central Limit Theorem",
     "💰 Creator Revenue & Heavy Tails",
-    "👀 Ad Impressions & Overdispersion",
-    "🧮 A/B Testing Equivalence (t² vs F vs χ²)"
+    "👀 Ad Impressions & Overdispersion"
 ])
 
 # ------------------------------------------------------------------------------
-# Tab 1: CTR & The Central Limit Theorem
+# Tab 1: A/B Testing Equivalence (t^2 vs F vs Chi-Square)
 # ------------------------------------------------------------------------------
 with tab1:
+    st.header(r"A/B Testing Equivalence: $t^2$, $F$, and $\chi^2$ Distributions")
+    st.markdown(r"""
+    When comparing metrics (like pageviews or time-on-page) between a Control and Variant group, we often use different statistical tests.
+    However, many of these tests are mathematically identical!
+
+    This tab demonstrates a beautiful mathematical property: the square of a Student's **$t$-distribution** with $\nu$ degrees of freedom is exactly an **$F$-distribution** with $(1, \nu)$ degrees of freedom.
+    Furthermore, as our sample size (traffic) grows to infinity, this distribution perfectly converges to a **$\chi^2$ (Chi-Square) distribution** with 1 degree of freedom!
+    """)
+
+    col1, col2 = st.columns([1, 3])
+
+    with col1:
+        st.subheader("Simulation Parameters")
+        dof = st.slider(
+            "Degrees of Freedom (ν) / Traffic",
+            min_value=2, max_value=100, value=2, step=1,
+            help="Low traffic means low degrees of freedom. High traffic approaches infinity."
+        )
+        n_samples_t = st.number_input(
+            "Number of Experiments to Simulate",
+            min_value=1000, max_value=50000, value=10000, step=1000
+        )
+
+    with col2:
+        np.random.seed(42)
+
+        # Draw from t-distribution and square it
+        t_samples = t.rvs(df=dof, size=n_samples_t)
+        t_squared_samples = t_samples**2
+
+        # Filter extreme outliers for better visualization
+        clip_t2 = np.percentile(t_squared_samples, 95)
+        filtered_t_squared = t_squared_samples[t_squared_samples < clip_t2]
+
+        # Create histogram of the simulated t^2
+        fig1 = px.histogram(
+            x=filtered_t_squared,
+            nbins=200,
+            histnorm='probability density',
+            title=f"Simulated t² vs Analytical F and χ² (ν = {dof})",
+            labels={'x': 'Test Statistic Value', 'y': 'Density'},
+            color_discrete_sequence=['#ff5722']
+        )
+        fig1.update_traces(name="Simulated t²", showlegend=True, opacity=0.7)
+
+        # Overlay Theoretical F-distribution
+        x_range_1 = np.linspace(0, max(filtered_t_squared), 500)
+        # Avoid exactly 0 for F and chi2 PDF to prevent infinity/warnings
+        x_range_1_safe = np.maximum(x_range_1, 1e-2)
+
+        pdf_f = f.pdf(x_range_1_safe, dfn=1, dfd=dof)
+
+        fig1.add_trace(go.Scatter(
+            x=x_range_1_safe, y=pdf_f,
+            mode='lines',
+            name=f'F(1, {dof}) Dist',
+            line=dict(color='#2d3748', width=3, dash='solid')
+        ))
+
+        # Overlay Theoretical Chi-Square distribution (df=1)
+        pdf_chi2 = chi2.pdf(x_range_1_safe, df=1)
+
+        fig1.add_trace(go.Scatter(
+            x=x_range_1_safe, y=pdf_chi2,
+            mode='lines',
+            name='χ²(1) Dist (Infinite Traffic)',
+            line=dict(color='#3b82f6', width=3, dash='dot')
+        ))
+
+        # Limit y-axis and x-axis to clip the infinite spike near 0 and see the curve body
+        # For lower degrees of freedom, the body is fatter, so we set a clear dynamic range
+        fig1.update_layout(
+            showlegend=True,
+            legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99),
+            yaxis_range=[0, 1.2],
+            xaxis_range=[0, min(max(filtered_t_squared), 10)]
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+
+    st.info(f"**Interactive Insight:** Move the Degrees of Freedom slider from {dof} to 100. Notice how the dark F-distribution (and the simulated orange t² histogram) dynamically shift and bend downwards to perfectly merge with the static dotted blue χ² curve representing infinite traffic!")
+
+    st.markdown("---")
+    st.subheader("The Mathematical Deduction")
+    st.markdown("Why does a two-sided two-sample T-test yield the exact same p-value as a one-way ANOVA? Because the underlying statistics are identical.")
+
+    st.latex(r"""
+    \text{By definition, a Student's } t\text{-variable with } \nu \text{ degrees of freedom is the ratio of a standard normal } Z \text{ to the square root of a scaled } \chi^2 \text{ variable:}
+    """)
+    st.latex(r"""
+    T_\nu = \frac{Z}{\sqrt{\chi^2_\nu / \nu}}
+    """)
+    st.latex(r"""
+    \text{If we square both sides:}
+    """)
+    st.latex(r"""
+    (T_\nu)^2 = \frac{Z^2}{\chi^2_\nu / \nu}
+    """)
+    st.latex(r"""
+    \text{We know that the square of a Standard Normal } (Z \sim N(0,1)) \text{ is exactly a Chi-Square with 1 degree of freedom } (Z^2 \sim \chi^2_1)\text{:}
+    """)
+    st.latex(r"""
+    (T_\nu)^2 = \frac{\chi^2_1 / 1}{\chi^2_\nu / \nu}
+    """)
+    st.latex(r"""
+    \text{By definition, an } F\text{-distribution } F(d_1, d_2) \text{ is the ratio of two independent Chi-Square variables, each divided by their degrees of freedom:}
+    """)
+    st.latex(r"""
+    F(d_1, d_2) = \frac{\chi^2_{d_1} / d_1}{\chi^2_{d_2} / d_2}
+    """)
+    st.latex(r"""
+    \text{Therefore, comparing the two equations, we get our exact proof:}
+    """)
+    st.latex(r"""
+    (T_\nu)^2 \sim F(1, \nu)
+    """)
+
+    st.markdown("""
+    **What happens as traffic (sample size) goes to infinity?**
+    By the Law of Large Numbers, as $\\nu \\to \\infty$, the denominator $\\chi^2_\\nu / \\nu$ converges in probability to its expected value, which is 1.
+    """)
+    st.latex(r"""
+    \lim_{\nu \to \infty} (T_\nu)^2 = \frac{\chi^2_1}{1} = \chi^2_1
+    """)
+    st.markdown("""
+    **Ad-Tech Conclusion:** When running an A/B test with massive traffic (like we do at Raptive), comparing the squared Z-score (or squared T-statistic) is mathematically identical to a Chi-Square test for independence!
+    """)
+
+# ------------------------------------------------------------------------------
+# Tab 2: CTR & The Central Limit Theorem
+# ------------------------------------------------------------------------------
+with tab2:
     st.header("Click-Through Rate (CTR) & The Central Limit Theorem")
     st.markdown("""
     In A/B testing for ad creatives, we often look at the **Click-Through Rate (CTR)**.
@@ -87,9 +218,9 @@ with tab1:
     st.info(f"**Insight:** Notice how as you increase the 'Impressions per Experiment', the histogram becomes narrower and perfectly matches the dashed Normal curve. This proves that with enough traffic, our CTR estimates become highly predictable normally-distributed variables!")
 
 # ------------------------------------------------------------------------------
-# Tab 2: Creator Revenue & Heavy Tails
+# Tab 3: Creator Revenue & Heavy Tails
 # ------------------------------------------------------------------------------
-with tab2:
+with tab3:
     st.header("Creator Revenue & The Power Law (Heavy Tails)")
     st.markdown("""
     Website traffic and creator revenue rarely follow a clean bell curve. Instead, they exhibit **Heavy Tails**—often following a **Pareto distribution** (the "80/20 rule").
@@ -135,9 +266,9 @@ with tab2:
     st.info(f"**Insight:** With an alpha of {pareto_alpha}, the top 20% of creators drive **{pct_from_top_20:.1f}%** of the total network revenue. If you lower the alpha, the tail gets heavier and this percentage increases. This is why standard metrics like the 'average revenue' don't represent the typical creator's experience!")
 
 # ------------------------------------------------------------------------------
-# Tab 3: Ad Impressions & Overdispersion
+# Tab 4: Ad Impressions & Overdispersion
 # ------------------------------------------------------------------------------
-with tab3:
+with tab4:
     st.header("Ad Impressions per User: Poisson vs. Negative Binomial")
     st.markdown("""
     If users visited web pages entirely at random, the number of ads they see in a month would follow a **Poisson distribution** (where mean = variance).
@@ -190,133 +321,3 @@ with tab3:
         st.plotly_chart(fig3, use_container_width=True)
 
     st.info(f"**Insight:** The Poisson model predicts almost everyone sees around {mean_impressions} ads. But the Negative Binomial model captures the real-world truth: a massive spike of users who see 0-1 ads (bouncers), and a long tail of power-users who binge and see many more ads than the average.")
-
-# ------------------------------------------------------------------------------
-# Tab 4: A/B Testing Equivalence (t^2 vs F vs Chi-Square)
-# ------------------------------------------------------------------------------
-with tab4:
-    st.header(r"A/B Testing Equivalence: $t^2$, $F$, and $\chi^2$ Distributions")
-    st.markdown(r"""
-    When comparing metrics (like pageviews or time-on-page) between a Control and Variant group, we often use different statistical tests.
-    However, many of these tests are mathematically identical!
-
-    This tab demonstrates a beautiful mathematical property: the square of a Student's **$t$-distribution** with $\nu$ degrees of freedom is exactly an **$F$-distribution** with $(1, \nu)$ degrees of freedom.
-    Furthermore, as our sample size (traffic) grows to infinity, this distribution perfectly converges to a **$\chi^2$ (Chi-Square) distribution** with 1 degree of freedom!
-    """)
-
-    col1, col2 = st.columns([1, 3])
-
-    with col1:
-        st.subheader("Simulation Parameters")
-        dof = st.slider(
-            "Degrees of Freedom ($\\nu$) / Traffic",
-            min_value=1, max_value=100, value=5, step=1,
-            help="Low traffic means low degrees of freedom. High traffic approaches infinity."
-        )
-        n_samples_t = st.number_input(
-            "Number of Experiments to Simulate",
-            min_value=1000, max_value=50000, value=10000, step=1000
-        )
-
-    with col2:
-        np.random.seed(42)
-
-        # Draw from t-distribution and square it
-        t_samples = t.rvs(df=dof, size=n_samples_t)
-        t_squared_samples = t_samples**2
-
-        # Filter extreme outliers for better visualization
-        clip_t2 = np.percentile(t_squared_samples, 95)
-        filtered_t_squared = t_squared_samples[t_squared_samples < clip_t2]
-
-        # Create histogram of the simulated t^2
-        fig4 = px.histogram(
-            x=filtered_t_squared,
-            nbins=200,
-            histnorm='probability density',
-            title=f"Simulated t² vs Analytical F and χ² (ν = {dof})",
-            labels={'x': 'Test Statistic Value', 'y': 'Density'},
-            color_discrete_sequence=['#ff5722']
-        )
-        fig4.update_traces(name="Simulated t²", showlegend=True, opacity=0.7)
-
-        # Overlay Theoretical F-distribution
-        x_range_4 = np.linspace(0, max(filtered_t_squared), 500)
-        # Avoid exactly 0 for F and chi2 PDF to prevent infinity/warnings
-        x_range_4_safe = np.maximum(x_range_4, 1e-2)
-
-        pdf_f = f.pdf(x_range_4_safe, dfn=1, dfd=dof)
-
-        fig4.add_trace(go.Scatter(
-            x=x_range_4_safe, y=pdf_f,
-            mode='lines',
-            name=f'F(1, {dof}) Dist',
-            line=dict(color='#2d3748', width=3, dash='solid')
-        ))
-
-        # Overlay Theoretical Chi-Square distribution (df=1)
-        pdf_chi2 = chi2.pdf(x_range_4_safe, df=1)
-
-        fig4.add_trace(go.Scatter(
-            x=x_range_4_safe, y=pdf_chi2,
-            mode='lines',
-            name='χ²(1) Dist (Infinite Traffic)',
-            line=dict(color='#3b82f6', width=3, dash='dot')
-        ))
-
-        # Limit y-axis and x-axis to clip the infinite spike near 0 and see the curve body
-        fig4.update_layout(
-            showlegend=True,
-            legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99),
-            yaxis_range=[0, 1.5],
-            xaxis_range=[0, min(max(filtered_t_squared), 10)]
-        )
-        st.plotly_chart(fig4, use_container_width=True)
-
-    st.info(f"**Interactive Insight:** Move the Degrees of Freedom slider. Notice how the simulated orange t² histogram **always** perfectly matches the dark F-distribution. As you increase ν to simulate high traffic, both perfectly merge into the dotted blue χ² distribution!")
-
-    st.markdown("---")
-    st.subheader("The Mathematical Deduction")
-    st.markdown("Why does a two-sided two-sample T-test yield the exact same p-value as a one-way ANOVA? Because the underlying statistics are identical.")
-
-    st.latex(r"""
-    \text{By definition, a Student's } t\text{-variable with } \nu \text{ degrees of freedom is the ratio of a standard normal } Z \text{ to the square root of a scaled } \chi^2 \text{ variable:}
-    """)
-    st.latex(r"""
-    T_\nu = \frac{Z}{\sqrt{\chi^2_\nu / \nu}}
-    """)
-    st.latex(r"""
-    \text{If we square both sides:}
-    """)
-    st.latex(r"""
-    (T_\nu)^2 = \frac{Z^2}{\chi^2_\nu / \nu}
-    """)
-    st.latex(r"""
-    \text{We know that the square of a Standard Normal } (Z \sim N(0,1)) \text{ is exactly a Chi-Square with 1 degree of freedom } (Z^2 \sim \chi^2_1)\text{:}
-    """)
-    st.latex(r"""
-    (T_\nu)^2 = \frac{\chi^2_1 / 1}{\chi^2_\nu / \nu}
-    """)
-    st.latex(r"""
-    \text{By definition, an } F\text{-distribution } F(d_1, d_2) \text{ is the ratio of two independent Chi-Square variables, each divided by their degrees of freedom:}
-    """)
-    st.latex(r"""
-    F(d_1, d_2) = \frac{\chi^2_{d_1} / d_1}{\chi^2_{d_2} / d_2}
-    """)
-    st.latex(r"""
-    \text{Therefore, comparing the two equations, we get our exact proof:}
-    """)
-    st.latex(r"""
-    (T_\nu)^2 \sim F(1, \nu)
-    """)
-
-    st.markdown("""
-    **What happens as traffic (sample size) goes to infinity?**
-    By the Law of Large Numbers, as $\\nu \\to \\infty$, the denominator $\\chi^2_\\nu / \\nu$ converges in probability to its expected value, which is 1.
-    """)
-    st.latex(r"""
-    \lim_{\nu \to \infty} (T_\nu)^2 = \frac{\chi^2_1}{1} = \chi^2_1
-    """)
-    st.markdown("""
-    **Ad-Tech Conclusion:** When running an A/B test with massive traffic (like we do at Raptive), comparing the squared Z-score (or squared T-statistic) is mathematically identical to a Chi-Square test for independence!
-    """)
