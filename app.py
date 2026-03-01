@@ -232,23 +232,23 @@ with tab4:
         # Create histogram of the simulated t^2
         fig4 = px.histogram(
             x=filtered_t_squared,
-            nbins=50,
+            nbins=200,
             histnorm='probability density',
-            title=rf"Simulated $t^2$ vs Analytical $F$ and $\chi^2$ ($\nu$ = {dof})",
+            title=f"Simulated t² vs Analytical F and χ² (ν = {dof})",
             labels={'x': 'Test Statistic Value', 'y': 'Density'},
             color_discrete_sequence=['#ff5722']
         )
-        fig4.update_traces(name="Simulated $t^2$", showlegend=True)
+        fig4.update_traces(name="Simulated t²", showlegend=True, opacity=0.7)
 
         # Overlay Theoretical F-distribution
-        x_range_4 = np.linspace(0, max(filtered_t_squared), 200)
+        x_range_4 = np.linspace(0, max(filtered_t_squared), 500)
         # Avoid exactly 0 for F and chi2 PDF to prevent infinity/warnings
-        x_range_4_safe = np.maximum(x_range_4, 1e-4)
+        x_range_4_safe = np.maximum(x_range_4, 1e-2)
 
         pdf_f = f.pdf(x_range_4_safe, dfn=1, dfd=dof)
 
         fig4.add_trace(go.Scatter(
-            x=x_range_4, y=pdf_f,
+            x=x_range_4_safe, y=pdf_f,
             mode='lines',
             name=f'F(1, {dof}) Dist',
             line=dict(color='#2d3748', width=3, dash='solid')
@@ -258,16 +258,22 @@ with tab4:
         pdf_chi2 = chi2.pdf(x_range_4_safe, df=1)
 
         fig4.add_trace(go.Scatter(
-            x=x_range_4, y=pdf_chi2,
+            x=x_range_4_safe, y=pdf_chi2,
             mode='lines',
-            name=r'$\chi^2(1)$ Dist (Infinite Traffic)',
+            name='χ²(1) Dist (Infinite Traffic)',
             line=dict(color='#3b82f6', width=3, dash='dot')
         ))
 
-        fig4.update_layout(showlegend=True, legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99))
+        # Limit y-axis and x-axis to clip the infinite spike near 0 and see the curve body
+        fig4.update_layout(
+            showlegend=True,
+            legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99),
+            yaxis_range=[0, 1.5],
+            xaxis_range=[0, min(max(filtered_t_squared), 10)]
+        )
         st.plotly_chart(fig4, use_container_width=True)
 
-    st.info(rf"**Interactive Insight:** Move the Degrees of Freedom slider. Notice how the simulated orange $t^2$ histogram **always** perfectly matches the dark $F$-distribution. As you increase $\nu$ to simulate high traffic, both perfectly merge into the dotted blue $\chi^2$ distribution!")
+    st.info(f"**Interactive Insight:** Move the Degrees of Freedom slider. Notice how the simulated orange t² histogram **always** perfectly matches the dark F-distribution. As you increase ν to simulate high traffic, both perfectly merge into the dotted blue χ² distribution!")
 
     st.markdown("---")
     st.subheader("The Mathematical Deduction")
